@@ -14,7 +14,7 @@ lazy_static! {
 }
 
 async fn index() -> impl Responder {
-    HttpResponse::Ok().content_type("text/html").body(INDEX)
+    HttpResponse::Ok().content_type("text/html").body(WEBUI)
 }
 
 async fn convert(body: web::Json<Data>) -> impl Responder {
@@ -26,13 +26,7 @@ async fn convert(body: web::Json<Data>) -> impl Responder {
 
 async fn check(body: web::Json<Data>) -> impl Responder {
     let data = body.0;
-    let mut msg = String::new();
-    if data.check() {
-        msg = format!("正确的 {}", data.from.unwrap());
-    } else {
-        msg = format!("不正确的 {}", data.from.unwrap());
-    }
-    HttpResponse::Ok().body(msg)
+    HttpResponse::Ok().body(data.check().to_string())
 }
 
 #[actix_web::main]
@@ -48,7 +42,7 @@ async fn main() -> std::io::Result<()> {
     .await
 }
 
-pub const INDEX: &str = r#"
+pub const WEBUI: &str = r#"
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -168,12 +162,16 @@ pub const INDEX: &str = r#"
                         to: this.to,
                         text: this.from_text,
                     }).then(resp => {
-                        this.to_text = resp.data;
+                        if (this.to === 'JSON' || this.to === 'json') {
+                            this.to_text = JSON.stringify(resp.data);
+                        } else {
+                            this.to_text = resp.data;
+                        }
                         this.loading = false
                     }).catch(resp => {
                         this.loading = false
                         this.$notify.error({
-                            title: '错误',
+                            title: '转换失败',
                             message: resp,
                             duration: 2000
                         });
@@ -184,8 +182,11 @@ pub const INDEX: &str = r#"
                         to: this.from,
                         text: this.to_text,
                     }).then(resp => {
-                        console.log(resp);
-                        this.from_text = resp.data;
+                        if (this.from === 'JSON' || this.from === 'json') {
+                            this.from_text = JSON.stringify(resp.data);
+                        } else {
+                            this.from_text = resp.data;
+                        }
                         this.loading = false
                     }).catch(resp => {
                         this.loading = false
@@ -203,18 +204,50 @@ pub const INDEX: &str = r#"
                         from: this.from,
                         text: this.from_text,
                     }).then(resp => {
-                        alert(resp.data);
+                        if (resp.data) {
+                            this.$message({
+                                showClose: true,
+                                message: '正确的 ' + this.from,
+                                type: 'success'
+                            });
+                        } else {
+                            this.$message({
+                                showClose: true,
+                                message: '不正确的 ' + this.from,
+                                type: 'error'
+                            });
+                        }
                     }).catch(e => {
-                        alert(e);
+                        this.$message({
+                            showClose: true,
+                            message: e,
+                            type: 'error'
+                        });
                     })
                 } else if (lr === 'right') {
                     axios.post("/check", {
                         from: this.to,
                         text: this.to_text,
                     }).then(resp => {
-                        alert(resp.data);
+                        if (resp.data) {
+                            this.$message({
+                                showClose: true,
+                                message: '正确的 ' + this.to,
+                                type: 'success'
+                            });
+                        } else {
+                            this.$message({
+                                showClose: true,
+                                message: '不正确的 ' + this.to,
+                                type: 'error'
+                            });
+                        }
                     }).catch(e => {
-                        alert(e);
+                        this.$message({
+                            showClose: true,
+                            message: e,
+                            type: 'error'
+                        });
                     })
                 }
             },
@@ -225,10 +258,18 @@ pub const INDEX: &str = r#"
                 } else if (ft === 'to') {
                     text = this.to_text;
                 }
-                this.$copyText(text).then(function (e) {
-                    alert('复制成功');
-                }, function (e) {
-                    alert('复制失败');
+                this.$copyText(text).then(e => {
+                    this.$message({
+                        showClose: true,
+                        message: '复制成功',
+                        type: 'success'
+                    });
+                }, e => {
+                    this.$message({
+                        showClose: true,
+                        message: '复制失败',
+                        type: 'error'
+                    });
                 })
             },
         }

@@ -13,43 +13,74 @@ pub struct Data {
 impl Data {
     // 格式转换
     pub fn convert(&self) -> String {
-        match self.from.clone().unwrap().to_lowercase().as_ref() {
-            "json" => match self.to.clone().unwrap().to_lowercase().as_ref() {
-                "yaml" => Self::to_yaml(Self::from_json::<serde_yaml::Value>(
-                    &self.text.clone().unwrap(),
-                )),
-                "toml" => {
-                    Self::to_toml(Self::from_json::<toml::Value>(&self.text.clone().unwrap()))
+        if let Some(text) = self.text.as_ref() {
+            if let Some(to) = self.to.as_ref() {
+                let mut from = "".to_string();
+                if let Some(f) = self.from.as_ref() {
+                    if f.is_empty() {
+                        from = Self::auto(text);
+                    } else {
+                        from = f.to_string();
+                    }
+                } else {
+                    from = Self::auto(text);
                 }
-                _ => self.text.clone().unwrap(),
-            },
-            "yaml" => match self.to.clone().unwrap().to_lowercase().as_ref() {
-                "json" => Self::to_json(Self::from_yaml::<serde_json::Value>(
-                    &self.text.clone().unwrap(),
-                )),
-                "toml" => {
-                    Self::to_toml(Self::from_yaml::<toml::Value>(&self.text.clone().unwrap()))
-                }
-                _ => self.text.clone().unwrap(),
-            },
-            "toml" => match self.to.clone().unwrap().to_lowercase().as_ref() {
-                "json" => Self::to_json(Self::from_toml::<serde_json::Value>(
-                    &self.text.clone().unwrap(),
-                )),
-                "yaml" => Self::to_yaml(Self::from_toml::<serde_yaml::Value>(
-                    &self.text.clone().unwrap(),
-                )),
-                _ => self.text.clone().unwrap(),
-            },
-            _ => self.text.clone().unwrap(),
+
+                return match from.to_lowercase().as_ref() {
+                    "json" => match to.to_lowercase().as_ref() {
+                        "yaml" => Self::to_yaml(Self::from_json::<serde_yaml::Value>(text)),
+                        "toml" => Self::to_toml(Self::from_json::<toml::Value>(text)),
+                        _ => text.to_string(),
+                    },
+                    "yaml" => match to.to_lowercase().as_ref() {
+                        "json" => Self::to_json(Self::from_yaml::<serde_json::Value>(text)),
+                        "toml" => Self::to_toml(Self::from_yaml::<toml::Value>(text)),
+                        _ => text.to_string(),
+                    },
+                    "toml" => match to.to_lowercase().as_ref() {
+                        "json" => Self::to_json(Self::from_toml::<serde_json::Value>(text)),
+                        "yaml" => Self::to_yaml(Self::from_toml::<serde_yaml::Value>(text)),
+                        _ => text.to_string(),
+                    },
+                    _ => text.to_string(),
+                };
+            }
         }
+        "".to_string()
     }
 }
 
 impl Data {
+    // 判断文件格式
+    pub fn auto(text: &str) -> String {
+        // FIXME: 寻找更好的办法
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(text) {
+            return "json".to_string();
+        }
+        if let Ok(v) = serde_yaml::from_str::<serde_yaml::Value>(text) {
+            return "yaml".to_string();
+        }
+        if let Ok(v) = toml::from_str::<toml::Value>(text) {
+            return "toml".to_string();
+        }
+        "".to_string()
+    }
+
     // 校验数据格式是否正确
     pub fn check(&self) -> bool {
-        true
+        if let Some(text) = self.text.as_ref() {
+            if let Some(f) = self.from.as_ref() {
+                // FIXME: 寻找更好的办法
+                return match f.to_lowercase().as_ref() {
+                    "json" => serde_json::from_str::<serde_json::Value>(text).is_ok(),
+                    // FIXME: json也被认为是yaml格式的
+                    "yaml" => serde_yaml::from_str::<serde_yaml::Value>(text).is_ok(),
+                    "toml" => toml::from_str::<toml::Value>(text).is_ok(),
+                    _ => false,
+                };
+            }
+        }
+        false
     }
 
     fn from_json<T>(text: &str) -> T
@@ -212,7 +243,7 @@ mod test {
 
         // json --> toml
         let mut jde = serde_json::Deserializer::from_str(JSON);
-        let mut tser = String::new();
+        let mut tser = "".to_string();
         let mut tse = toml::Serializer::new(&mut tser);
         serde_transcode::transcode(&mut jde, &mut tse);
         println!("{}", tser);
