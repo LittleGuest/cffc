@@ -1,21 +1,22 @@
 use serde::{Deserialize, Serialize};
 
+/// Data
 #[derive(Serialize, Deserialize)]
 pub struct Data {
-    // 原始格式
+    /// 原始格式
     pub from: Option<String>,
-    // 转变的格式
-    to: Option<String>,
-    // 文本数据
-    text: Option<String>,
+    /// 目标格式
+    pub to: Option<String>,
+    /// 文本数据
+    pub text: Option<String>,
 }
 
 impl Data {
-    // 格式转换
+    /// 格式转换
     pub fn convert(&self) -> String {
         if let Some(text) = self.text.as_ref() {
             if let Some(to) = self.to.as_ref() {
-                let mut from = "".to_string();
+                let from;
                 if let Some(f) = self.from.as_ref() {
                     if f.is_empty() {
                         from = Self::auto(text);
@@ -28,18 +29,18 @@ impl Data {
 
                 return match from.to_lowercase().as_ref() {
                     "json" => match to.to_lowercase().as_ref() {
-                        "yaml" => Self::to_yaml(Self::from_json::<serde_yaml::Value>(text)),
-                        "toml" => Self::to_toml(Self::from_json::<toml::Value>(text)),
+                        "yaml" => Self::cto_yaml(Self::from_json::<serde_yaml::Value>(text)),
+                        "toml" => Self::cto_toml(Self::from_json::<toml::Value>(text)),
                         _ => text.to_string(),
                     },
                     "yaml" => match to.to_lowercase().as_ref() {
-                        "json" => Self::to_json(Self::from_yaml::<serde_json::Value>(text)),
-                        "toml" => Self::to_toml(Self::from_yaml::<toml::Value>(text)),
+                        "json" => Self::cto_json(Self::from_yaml::<serde_json::Value>(text)),
+                        "toml" => Self::cto_toml(Self::from_yaml::<toml::Value>(text)),
                         _ => text.to_string(),
                     },
                     "toml" => match to.to_lowercase().as_ref() {
-                        "json" => Self::to_json(Self::from_toml::<serde_json::Value>(text)),
-                        "yaml" => Self::to_yaml(Self::from_toml::<serde_yaml::Value>(text)),
+                        "json" => Self::cto_json(Self::from_toml::<serde_json::Value>(text)),
+                        "yaml" => Self::cto_yaml(Self::from_toml::<serde_yaml::Value>(text)),
                         _ => text.to_string(),
                     },
                     _ => text.to_string(),
@@ -51,22 +52,22 @@ impl Data {
 }
 
 impl Data {
-    // 判断文件格式
+    /// 判断文件格式
     pub fn auto(text: &str) -> String {
         // FIXME: 寻找更好的办法
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(text) {
+        if serde_json::from_str::<serde_json::Value>(text).is_ok() {
             return "json".to_string();
         }
-        if let Ok(v) = serde_yaml::from_str::<serde_yaml::Value>(text) {
+        if serde_yaml::from_str::<serde_yaml::Value>(text).is_ok() {
             return "yaml".to_string();
         }
-        if let Ok(v) = toml::from_str::<toml::Value>(text) {
+        if toml::from_str::<toml::Value>(text).is_ok() {
             return "toml".to_string();
         }
         "".to_string()
     }
 
-    // 校验数据格式是否正确
+    /// 校验数据格式是否正确
     pub fn check(&self) -> bool {
         if let Some(text) = self.text.as_ref() {
             if let Some(f) = self.from.as_ref() {
@@ -104,21 +105,21 @@ impl Data {
         toml::from_str(text).expect("TOML 反序列化失败")
     }
 
-    fn to_json<T>(v: T) -> String
+    fn cto_json<T>(v: T) -> String
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
         serde_json::to_string(&v).expect("JSON 序列化失败")
     }
 
-    fn to_yaml<T>(v: T) -> String
+    fn cto_yaml<T>(v: T) -> String
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
         serde_yaml::to_string(&v).expect("YAML 序列化失败")
     }
 
-    fn to_toml<T>(v: T) -> String
+    fn cto_toml<T>(v: T) -> String
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
@@ -126,12 +127,10 @@ impl Data {
     }
 }
 
+#[allow(dead_code)]
+#[allow(unused_imports)]
 mod test {
-    use std::collections::HashMap;
-
-    use serde_transcode::transcode;
-
-    use super::*;
+    use super::Data;
 
     #[test]
     fn test_convert() {
